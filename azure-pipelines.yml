@@ -1,0 +1,55 @@
+trigger:
+- master
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  buildConfiguration: 'Release'
+
+stages:
+- stage: Build
+  jobs:
+  - job: Build
+    steps:
+    - task: UseDotNet@2
+      inputs:
+        packageType: 'sdk'
+        version: '5.x'
+        installationPath: $(Agent.ToolsDirectory)/dotnet
+
+    - task: Docker@2
+      inputs:
+        containerRegistry: 'your-azure-container-registry-service-connection'
+        repository: 'juice-shop'
+        command: 'build'
+        Dockerfile: '**/Dockerfile'
+        tags: '$(Build.BuildId)'
+
+- stage: Deploy
+  jobs:
+  - job: Deploy
+    environment: 'Dev'
+    steps:
+    - task: Docker@2
+      inputs:
+        containerRegistry: 'your-azure-container-registry-service-connection'
+        repository: 'juice-shop'
+        command: 'run'
+        detached: true
+        ports: '3000:3000'
+        imageName: 'juice-shop:$(Build.BuildId)'
+
+- stage: DAST
+  jobs:
+  - job: DAST
+    steps:
+    - script: |
+        docker run -d -p 8080:8080 owasp/zap2docker-stable
+        sleep 30
+        docker run -t owasp/zap2docker-stable zap-full-scan.py -t http://localhost:3000 -r zap_report.html
+        docker cp $(docker ps -q -f ancestor=owasp/zap2docker-stable):/zap/wrk/zap_report.html $(Build.ArtifactStagingDirectory)
+      displayName: 'Run ZAP Scan'
+
+    - publish: $(Build.ArtifactStagingDirectory)/zap_report.html
+      artifact: zapReport
