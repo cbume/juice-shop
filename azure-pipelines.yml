@@ -20,7 +20,7 @@ stages:
 
     - task: Docker@2
       inputs:
-        containerRegistry: 'your-azure-container-registry-service-connection'
+        containerRegistry: $(dockerRegistryServiceConnection)
         repository: 'juice-shop'
         command: 'build'
         Dockerfile: '**/Dockerfile'
@@ -33,23 +33,9 @@ stages:
     steps:
     - task: Docker@2
       inputs:
-        containerRegistry: 'your-azure-container-registry-service-connection'
+        containerRegistry: $(dockerRegistryServiceConnection)
         repository: 'juice-shop'
         command: 'run'
         detached: true
         ports: '3000:3000'
         imageName: 'juice-shop:$(Build.BuildId)'
-
-- stage: DAST
-  jobs:
-  - job: DAST
-    steps:
-    - script: |
-        docker run -d -p 8080:8080 owasp/zap2docker-stable
-        sleep 30
-        docker run -t owasp/zap2docker-stable zap-full-scan.py -t http://localhost:3000 -r zap_report.html
-        docker cp $(docker ps -q -f ancestor=owasp/zap2docker-stable):/zap/wrk/zap_report.html $(Build.ArtifactStagingDirectory)
-      displayName: 'Run ZAP Scan'
-
-    - publish: $(Build.ArtifactStagingDirectory)/zap_report.html
-      artifact: zapReport
