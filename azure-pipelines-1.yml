@@ -27,10 +27,13 @@ steps:
 - script: |
     echo "Cloning Nuclei Templates"
     git clone https://github.com/projectdiscovery/nuclei-templates.git
+  displayName: 'Clone Nuclei Templates'
 
+- script: |
     echo "Running Nuclei on target URLs"
     for url in $(echo $(app_urls)); do
-      nuclei -u $url -t nuclei-templates -o output-$url.txt
+      sanitized_url=$(echo $url | sed 's/[:\/]/-/g')
+      nuclei -u $url -t nuclei-templates -o output-$sanitized_url.txt
     done
   displayName: 'Run Nuclei Security Scans'
 
