@@ -1,0 +1,42 @@
+trigger:
+  branches:
+    include:
+      - main
+      - release/*
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  app_urls: |
+    http://www.dvwa.co.uk/
+
+steps:
+- script: |
+    echo "Installing dependencies"
+    sudo apt-get update
+    sudo apt-get install -y wget unzip
+
+    echo "Installing Nuclei"
+    wget https://github.com/projectdiscovery/nuclei/releases/download/v2.8.6/nuclei_2.8.6_linux_amd64.zip
+    unzip nuclei_2.8.6_linux_amd64.zip
+    sudo mv nuclei /usr/local/bin/
+    nuclei -version
+  displayName: 'Install Nuclei'
+
+- script: |
+    echo "Cloning Nuclei Templates"
+    git clone https://github.com/projectdiscovery/nuclei-templates.git
+
+    echo "Running Nuclei on target URLs"
+    for url in $(echo $(app_urls)); do
+      nuclei -u $url -t nuclei-templates -o output-$url.txt
+    done
+  displayName: 'Run Nuclei Security Scans'
+
+- task: PublishBuildArtifacts@1
+  inputs:
+    pathToPublish: '$(System.DefaultWorkingDirectory)'
+    artifactName: 'nuclei-scan-results'
+    publishLocation: 'Container'
+  displayName: 'Publish Scan Results'
